@@ -4,13 +4,27 @@ import { persist } from "zustand/middleware";
 export interface FavoritePlayer {
   name: string;
   tag: string;
+  region?: string;
   addedAt: number;
 }
 
+export const REGIONS = [
+  { value: "na", label: "NA" },
+  { value: "eu", label: "EU" },
+  { value: "ap", label: "AP" },
+  { value: "kr", label: "KR" },
+  { value: "br", label: "BR" },
+  { value: "latam", label: "LATAM" },
+] as const;
+
+export type Region = (typeof REGIONS)[number]["value"];
+
 interface TrackerState {
   favorites: FavoritePlayer[];
-  recentSearches: string[]; // "name#tag"
-  addFavorite: (name: string, tag: string) => void;
+  recentSearches: string[];
+  region: Region;
+  setRegion: (region: Region) => void;
+  addFavorite: (name: string, tag: string, region?: string) => void;
   removeFavorite: (name: string, tag: string) => void;
   isFavorite: (name: string, tag: string) => boolean;
   addRecentSearch: (query: string) => void;
@@ -21,14 +35,17 @@ export const useTrackerStore = create<TrackerState>()(
     (set, get) => ({
       favorites: [],
       recentSearches: [],
+      region: "na",
 
-      addFavorite: (name, tag) => {
+      setRegion: (region) => set({ region }),
+
+      addFavorite: (name, tag, region) => {
         const already = get().isFavorite(name, tag);
         if (already) return;
         set((state) => ({
           favorites: [
             ...state.favorites,
-            { name, tag, addedAt: Date.now() },
+            { name, tag, region: region ?? get().region, addedAt: Date.now() },
           ],
         }));
       },
@@ -55,7 +72,7 @@ export const useTrackerStore = create<TrackerState>()(
       },
     }),
     {
-      name: "valorant-tracker-storage",
+      name: "clutchly-storage",
     }
   )
 );

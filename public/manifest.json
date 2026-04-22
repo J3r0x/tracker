@@ -1,0 +1,23 @@
+{
+  "name": "Clutchly",
+  "short_name": "Clutchly",
+  "description": "Track your Valorant stats, rank, and performance — built for grinders.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07080c",
+  "theme_color": "#22d3ee",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ]
+}
