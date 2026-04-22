@@ -7,9 +7,11 @@ import { useTrackerStore } from "@/stores/tracker-store";
 
 interface SearchBarProps {
   compact?: boolean;
+  game?: "valorant" | "lol";
+  lolRegion?: string;
 }
 
-export function SearchBar({ compact = false }: SearchBarProps) {
+export function SearchBar({ compact = false, game = "valorant", lolRegion }: SearchBarProps) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -35,7 +37,9 @@ export function SearchBar({ compact = false }: SearchBarProps) {
     addRecentSearch(trimmed);
     setQuery("");
     setOpen(false);
-    router.push(`/player/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?region=${region}`);
+    const base = game === "lol" ? "/lol" : "/player";
+    const regionParam = game === "lol" ? (lolRegion ?? "lan") : region;
+    router.push(`${base}/${encodeURIComponent(name)}/${encodeURIComponent(tag)}?region=${regionParam}`);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -70,7 +74,7 @@ export function SearchBar({ compact = false }: SearchBarProps) {
           spellCheck={false}
           className={cn(
             "w-full bg-white/[0.03] border border-white/[0.07] rounded-md text-white placeholder:text-zinc-600",
-            "focus:outline-none focus:border-cyan-400/50 focus:bg-white/[0.04] transition-all",
+            "focus:outline-none focus:border-[#C8AA6E]/40 focus:bg-white/[0.04] transition-all",
             compact
               ? "pl-8 pr-3 py-1.5 text-sm"
               : "pl-10 pr-4 py-3.5 text-base"
@@ -104,7 +108,7 @@ export function SearchBar({ compact = false }: SearchBarProps) {
         type="submit"
         disabled={!isValid}
         className={cn(
-            "bg-cyan-400 hover:bg-cyan-300 active:bg-cyan-500 text-black font-black rounded-md transition-all shrink-0 disabled:opacity-30 disabled:cursor-not-allowed",
+            "bg-[#C8AA6E] hover:bg-[#d4b87a] active:bg-[#b89a5e] text-black font-black rounded-md transition-all shrink-0 disabled:opacity-30 disabled:cursor-not-allowed",
           compact ? "px-3 py-1.5 text-sm" : "px-5 py-3.5 text-sm tracking-wide"
         )}
       >
