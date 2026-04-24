@@ -1,12 +1,8 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { getCachedAccount, getCachedMatchHistory, getCachedMMRHistory, getCachedPlayerMMR } from "@/lib/api/cached";
+import { getCachedAccount, getCachedMMRHistory, getCachedPlayerMMR } from "@/lib/api/cached";
 import { PlayerHeader } from "@/components/player/player-header";
-import { PerformanceOverview } from "@/components/player/performance-overview";
-import { MatchHistory } from "@/components/player/match-history";
-import { MMRChart } from "@/components/player/mmr-chart";
-import { AgentStats } from "@/components/player/agent-stats";
-import { MapStats } from "@/components/player/map-stats";
-import { MostPlayedWith } from "@/components/player/most-played-with";
+import { MatchSections, MatchSectionsSkeleton } from "@/components/player/match-sections";
 
 interface PageProps {
   params: Promise<{ name: string; tag: string }>;
@@ -69,105 +65,48 @@ export default async function PlayerPage({ params, searchParams }: PageProps) {
   const decodedName = decodeURIComponent(name);
   const decodedTag = decodeURIComponent(tag);
 
-  // Cuenta + región auto-detectada desde Henrik (1 sola llamada)
-  let account;
-  try {
-    account = await getCachedAccount(decodedName, decodedTag);
-  } catch {
-    notFound();
-  }
+  // Fetch account first — Henrik auto-detects the correct region from the Riot account.
+  // This is the authoritative source; regionParam from the URL can be wrong (e.g. user had LATAM
+  // selected in the store when searching an NA player).
+  const account = await getCachedAccount(decodedName, decodedTag).catch(() => null);
+  if (!account) notFound();
 
-  const region = (regionParam ?? account.region ?? "na").toLowerCase();
+  const resolvedRegion = (account.region ?? regionParam ?? "na").toLowerCase();
 
-  // Todo lo demás es opcional — falla silenciosamente
-  const [mmrResult, matchesResult, mmrHistoryResult] = await Promise.allSettled([
-    getCachedPlayerMMR(decodedName, decodedTag, region),
-    getCachedMatchHistory(decodedName, decodedTag, region, 20, "competitive"),
-    getCachedMMRHistory(decodedName, decodedTag, region),
+  // Now fetch the remaining fast endpoints in parallel with the correct region
+  const [mmrResult, mmrHistoryResult] = await Promise.allSettled([
+    getCachedPlayerMMR(decodedName, decodedTag, resolvedRegion),
+    getCachedMMRHistory(decodedName, decodedTag, resolvedRegion),
   ]);
 
   const mmrData = mmrResult.status === "fulfilled" ? mmrResult.value : null;
   const mmrHistory = mmrHistoryResult.status === "fulfilled" ? mmrHistoryResult.value : [];
 
-  // Filtrar partidas con metadata o players nulos (custom games, etc.)
-  const rawMatches = matchesResult.status === "fulfilled" ? matchesResult.value : [];
-  const matchesData = rawMatches.filter(
-    (m) => m?.metadata != null && m?.players?.all_players != null
-  );
-
-  // Player card desde el primer match disponible
-  const firstMatchPlayer = matchesData[0]?.players?.all_players?.find(
-    (p) =>
-      p.name.toLowerCase() === decodedName.toLowerCase() &&
-      p.tag.toLowerCase() === decodedTag.toLowerCase()
-  );
-  const playerCard = firstMatchPlayer?.assets?.card?.wide ?? account.card?.wide ?? undefined;
-
   return (
     <main className="min-h-[calc(100vh-3.5rem)]">
-      {/* Full-width hero header */}
+      {/* Header renders immediately — no match data needed */}
       <div className="max-w-[1400px] mx-auto px-4 sm:px-4 pt-6">
         <PlayerHeader
           account={{ puuid: account.puuid, gameName: account.name, tagLine: account.tag }}
           mmr={mmrData}
-          playerCard={playerCard}
-          region={region}
+          playerCard={account.card?.wide}
+          region={resolvedRegion}
           accountLevel={account.account_level}
-          matches={matchesData}
           playerName={decodedName}
           playerTag={decodedTag}
         />
       </div>
 
-      {/* Main + Sidebar layout */}
-      <div className="max-w-[1400px] mx-auto px-4 pb-6">
-        <div className="flex flex-col lg:flex-row gap-5 items-start">
-
-          {/* ── Main column ── */}
-          <div className="flex-1 min-w-0">
-            {/* Unified performance overview (stats + insights) */}
-            <PerformanceOverview
-              matches={matchesData}
-              name={decodedName}
-              tag={decodedTag}
-            />
-
-            {/* Rank history chart */}
-            {(mmrData || mmrHistory.length > 0) && (
-              <div className="mb-6">
-                <MMRChart history={mmrHistory} mmr={mmrData} />
-              </div>
-            )}
-
-            {/* Match history */}
-            <MatchHistory
-              matches={matchesData}
-              name={decodedName}
-              tag={decodedTag}
-            />
-          </div>
-
-          {/* ── Sidebar ── */}
-          <div className="w-full lg:w-[300px] shrink-0 flex flex-col gap-4">
-            <AgentStats
-              matches={matchesData}
-              name={decodedName}
-              tag={decodedTag}
-            />
-            <MapStats
-              matches={matchesData}
-              name={decodedName}
-              tag={decodedTag}
-            />
-            <MostPlayedWith
-              matches={matchesData}
-              name={decodedName}
-              tag={decodedTag}
-            />
-          </div>
-
-        </div>
-      </div>
+      {/* Match sections stream in independently — don't block the header */}
+      <Suspense fallback={<MatchSectionsSkeleton />}>
+        <MatchSections
+          name={decodedName}
+          tag={decodedTag}
+          region={resolvedRegion}
+          mmrData={mmrData}
+          mmrHistory={mmrHistory}
+        />
+      </Suspense>
     </main>
   );
 }
